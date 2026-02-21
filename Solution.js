@@ -1,49 +1,51 @@
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.math.BigInteger;
-import java.util.*;
+const fs = require('fs');
 
-public class Solution {
-    public static void main(String[] args) {
-        try {
-            // This line reads the file directly so you don't have to paste anything
-            String json = new String(Files.readAllBytes(Paths.get("input.json")));
-            
-            int k = Integer.parseInt(extract(json, "k"));
-            List<Point> points = new ArrayList<>();
-            for (int i = 1; i <= 20; i++) {
-                if (json.contains("\"" + i + "\"")) {
-                    int start = json.indexOf("{", json.indexOf("\"" + i + "\""));
-                    int end = json.indexOf("}", start);
-                    String block = json.substring(start, end + 1);
-                    points.add(new Point(i, new BigInteger(extract(block, "value"), Integer.parseInt(extract(block, "base")))));
-                }
-            }
-            points.sort(Comparator.comparingInt(p -> p.x));
-            List<Point> sub = points.subList(0, k);
-            BigInteger secret = BigInteger.ZERO;
-            for (int i = 0; i < k; i++) {
-                BigInteger xi = BigInteger.valueOf(sub.get(i).x), yi = sub.get(i).y;
-                BigInteger num = BigInteger.ONE, den = BigInteger.ONE;
-                for (int j = 0; j < k; j++) {
-                    if (i != j) {
-                        BigInteger xj = BigInteger.valueOf(sub.get(j).x);
-                        num = num.multiply(xj.negate());
-                        den = den.multiply(xi.subtract(xj));
-                    }
-                }
-                secret = secret.add(yi.multiply(num).divide(den));
-            }
-            System.out.println(secret.toString());
-        } catch (Exception e) { e.printStackTrace(); }
-    }
+// Read the file - make sure this filename is EXACTLY right
+const input = fs.readFileSync('testcase2.json', 'utf8');
+const data = JSON.parse(input);
 
-    private static String extract(String t, String k) {
-        int i = t.indexOf("\"" + k + "\"");
-        int c = t.indexOf(":", i);
-        int e = t.indexOf(",", c);
-        if (e == -1 || e > t.indexOf("}", c)) e = t.indexOf("}", c);
-        return t.substring(c + 1, e).replace("\"", "").trim();
+const k = data.keys.k;
+let points = [];
+
+// Instead of a loop that might skip keys, we look for them specifically
+// Your JSON has keys "1" through "10"
+for (let i = 1; i <= 15; i++) {
+    if (data[i]) {
+        let x = BigInt(i);
+        let base = BigInt(data[i].base);
+        let valueStr = data[i].value;
+
+        // Perfect BigInt decoding
+        let y = 0n;
+        for (let char of valueStr) {
+            let digit = BigInt(parseInt(char, 36)); 
+            y = y * base + digit;
+        }
+        points.push({ x, y });
     }
-    static class Point { int x; BigInteger y; Point(int x, BigInteger y) { this.x = x; this.y = y; }}
 }
+
+// 1. Sort numerically
+points.sort((a, b) => (a.x < b.x ? -1 : 1));
+
+// 2. Select exactly the first k points
+const subPoints = points.slice(0, k);
+
+// 3. Lagrange Math
+let secret = 0n;
+for (let i = 0; i < k; i++) {
+    let xi = subPoints[i].x;
+    let yi = subPoints[i].y;
+    let num = 1n;
+    let den = 1n;
+    for (let j = 0; j < k; j++) {
+        if (i !== j) {
+            let xj = subPoints[j].x;
+            num *= (0n - xj);
+            den *= (xi - xj);
+        }
+    }
+    secret += (yi * num) / den;
+}
+
+console.log(secret.toString());
